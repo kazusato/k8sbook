@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-app
+  labels:
+    app: backend-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend-app
+  template:
+    metadata:
+      labels:
+        app: backend-app
+    spec:
+      containers:
+        - name: backend-app
+          image: backend-app-image
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 8080
+          env:
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  key: db-url
+                  name: db-config
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  key: db-username
+                  name: db-config
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: db-password
+                  name: db-config
+          readinessProbe:
+            httpGet:
+              port: 8080
+              path: /health
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          livenessProbe:
+            httpGet:
+              port: 8080
+              path: /health
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 250m
+              memory: 768Mi

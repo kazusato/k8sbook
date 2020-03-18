@@ -1,0 +1,47 @@
+plugins {
+    id 'org.springframework.boot' version '2.2.5.RELEASE'
+    id 'io.spring.dependency-management' version '1.0.9.RELEASE'
+    id 'java'
+}
+
+group = 'k8sbook'
+version = '1.0.0'
+sourceCompatibility = '11'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':sample-app-common')
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.apache.commons:commons-lang3:3.9'
+    runtimeOnly 'org.postgresql:postgresql'
+    testImplementation('org.springframework.boot:spring-boot-starter-test') {
+        exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+    }
+    testImplementation 'com.ninja-squad:DbSetup:2.1.0'
+    testImplementation 'org.assertj:assertj-db:1.3.0'
+}
+
+test {
+    useJUnitPlatform {
+        excludeTags 'DBRequired'
+    }
+    environment "DB_URL", localDbUrl
+    environment "DB_USERNAME", localDbUsername
+    environment "DB_PASSWORD", localDbPassword
+}
+
+task testWithDatabase(type: Test, dependsOn: testClasses) {
+    useJUnitPlatform {
+    }
+    environment "DB_URL", localDbUrl
+    environment "DB_USERNAME", localDbUsername
+    environment "DB_PASSWORD", localDbPassword
+}
+
+bootJar {
+    launchScript()
+}

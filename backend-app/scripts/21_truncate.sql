@@ -1,0 +1,2 @@
+TRUNCATE TABLE region CASCADE;
+TRUNCATE TABLE batch_processing CASCADE;

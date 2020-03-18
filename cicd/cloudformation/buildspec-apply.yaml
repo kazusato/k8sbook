@@ -1,0 +1,37 @@
+version: 0.2
+ 
+phases:
+  install:
+    runtime-versions:
+      java: openjdk11
+      docker: 18
+
+  pre_build:
+    commands:
+      # Install AWS CLI
+      - apt-get update
+      - apt install -y wget python
+      - wget https://bootstrap.pypa.io/get-pip.py
+      - python get-pip.py
+      - pip install awscli --upgrade
+
+      # Install kubectl 
+      # - export KUBECTL_VERSION=1.14.0
+      - wget https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl
+      - chmod 755 kubectl 
+      - mv kubectl /usr/local/bin/
+
+      # Set up kubectl
+      # - aws --region us-east-2 eks update-kubeconfig --name kaizawa-eks-test-20190222
+      - aws --region ${REGION} eks update-kubeconfig --name ${EKS_CLUSTER_NAME}
+      - kubectl
+
+  build:
+    commands:
+      # Apply to EKS-Cluster.
+      - kubectl get all -n eks-work
+      - kubectl kustomize cicd/kustomization/prod
+      - kubectl -n eks-work apply -k cicd/kustomization/prod
+      - kubectl get all -n eks-work
+
+

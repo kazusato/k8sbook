@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: batch-app-config
+data:
+  bucket-name: eks-work-batch-${BUCKET_SUFFIX}
+  folder-name: locationData
+  batch-run: "true"
+  aws-region: ap-northeast-1

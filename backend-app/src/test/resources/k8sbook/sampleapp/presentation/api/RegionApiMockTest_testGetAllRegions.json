@@ -1,0 +1,12 @@
+{
+  "regionList": [
+    {
+      "regionId": 1,
+      "regionName": "地域1"
+    },
+    {
+      "regionId": 2,
+      "regionName": "地域2"
+    }
+  ]
+}

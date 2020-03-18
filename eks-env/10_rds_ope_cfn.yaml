@@ -1,0 +1,286 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Parameters:
+  EksWorkVPC:
+    Type: AWS::EC2::VPC::Id
+
+  WorkerSubnet1Block:
+    Type: String
+    Default: 192.168.0.0/24
+
+  WorkerSubnet2Block:
+    Type: String
+    Default: 192.168.1.0/24
+
+  WorkerSubnet3Block:
+    Type: String
+    Default: 192.168.2.0/24
+
+  OpeSubnetBlock:
+    Type: String
+    Default: 192.168.5.0/24
+
+  OpeServerRouteTable:
+    Type: String
+
+  ClusterBaseName:
+    Type: String
+    Default: eks-work
+
+  TargetRegion:
+    Type: String
+    Default: ap-northeast-1
+
+  AvailabilityZone1:
+    Type: String
+    Default: ap-northeast-1a
+
+  AvailabilityZone2:
+    Type: String
+    Default: ap-northeast-1c
+
+  AvailabilityZone3:
+    Type: String
+    Default: ap-northeast-1d
+
+  RdsSubnet1Block:
+    Type: String
+    Default: 192.168.3.0/24
+
+  RdsSubnet2Block:
+    Type: String
+    Default: 192.168.4.0/24
+
+  OpeServerInstanceType:
+    Type: String
+    Default: t2.micro
+
+  OpeServerImageId:
+    Type: String
+    Default: ami-00d101850e971728d # ap-northeast-1, SSD, Amazon Linux 2
+
+  OpeServerVolumeSize:
+    Type: Number
+    Default: 8
+
+Resources:
+  RdsSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone1
+      CidrBlock: !Ref RdsSubnet1Block
+      VpcId: !Ref EksWorkVPC
+
+  RdsSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone2
+      CidrBlock: !Ref RdsSubnet2Block
+      VpcId: !Ref EksWorkVPC
+
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for RDS
+      VpcId: !Ref EksWorkVPC
+
+  RdsIngressPostgreSQLWorker1:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      CidrIp: !Ref WorkerSubnet1Block
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+
+  RdsIngressPostgreSQLWorker2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      CidrIp: !Ref WorkerSubnet2Block
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+
+  RdsIngressPostgreSQLWorker3:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      CidrIp: !Ref WorkerSubnet3Block
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+
+  RdsIngressPostgreSQLOpe:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      CidrIp: !Ref OpeSubnetBlock
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+
+  EksWorkDB:
+    Type: "AWS::RDS::DBInstance"
+    Properties:
+      DBInstanceIdentifier: eks-work-db
+      Engine: postgres
+      EngineVersion: 10.6
+      DBInstanceClass: db.t2.micro
+      AllocatedStorage: 30
+      StorageType: gp2
+      DBName: eksworkdb
+      MasterUsername: !Join ['', ['{{resolve:secretsmanager:', !Ref RdsMasterSecret, ':SecretString:username}}' ]]
+      MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref RdsMasterSecret, ':SecretString:password}}' ]]
+      DBSubnetGroupName: !Ref EksWorkDBSubnetGroup
+      PubliclyAccessible: false
+      MultiAZ: false
+      PreferredBackupWindow: 18:00-18:30
+      PreferredMaintenanceWindow: sat:19:00-sat:19:30
+      AutoMinorVersionUpgrade: false
+      DBParameterGroupName: !Ref EksWorkDBParameterGroup
+      VPCSecurityGroups:
+        - !Ref RdsSecurityGroup
+      CopyTagsToSnapshot: true
+      BackupRetentionPeriod: 7
+      DeletionProtection: false
+
+  RdsMasterSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "eksdbadmin"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'''
+      Name: RdsMasterSecret
+
+  RdsUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "mywork"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\''{}#%&*<>[]^`|'
+      Name: RdsUserSecret
+
+  RdsSecretAttachment:
+    Type: AWS::SecretsManager::SecretTargetAttachment
+    Properties:
+      SecretId: !Ref RdsMasterSecret
+      TargetId: !Ref EksWorkDB
+      TargetType: AWS::RDS::DBInstance
+
+  EksWorkDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: subnet-group-eks-work-db
+      DBSubnetGroupDescription: "DB Subnet Group"
+      SubnetIds:
+        - !Ref RdsSubnet1
+        - !Ref RdsSubnet2
+
+  EksWorkDBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: postgres10
+      Description: Parameter Group for PostgreSQL 10.6
+
+  OpeServerSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone1
+      CidrBlock: !Ref OpeSubnetBlock
+      VpcId: !Ref EksWorkVPC
+
+  OpeServerSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref OpeServerSubnet
+      RouteTableId: !Ref OpeServerRouteTable
+
+  OpeServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Ope
+      VpcId: !Ref EksWorkVPC
+
+  RdsIngressPostgreSQLFromOpe:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      SourceSecurityGroupId: !Ref OpeServerSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+
+  OpeServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ClusterBaseName}-OpeServerRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+
+  OpeServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref OpeServerRole
+
+  OpeServerEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  OpeServerEIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt OpeServerEIP.AllocationId
+      InstanceId: !Ref OpeServerInstance
+
+  OpeServerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref OpeServerInstanceType
+      ImageId: !Ref OpeServerImageId
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeType: gp2
+            VolumeSize: 8
+            DeleteOnTermination: true
+      NetworkInterfaces:
+        - SubnetId: !Ref OpeServerSubnet
+          AssociatePublicIpAddress: false
+          GroupSet:
+            - !Ref OpeServerSecurityGroup
+          DeviceIndex: 0
+          DeleteOnTermination: true
+      DisableApiTermination: false
+      IamInstanceProfile: !Ref OpeServerInstanceProfile
+      UserData:
+        Fn::Base64:
+          !Sub |
+          #!/bin/bash
+          set -o xtrace
+          yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+          /opt/aws/bin/cfn-signal --exit-code $? \
+                   --stack  ${AWS::StackName} \
+                   --resource NodeGroup  \
+                   --region ${AWS::Region}
+
+Outputs:
+  RDSEndpoint:
+    Value: !GetAtt EksWorkDB.Endpoint.Address

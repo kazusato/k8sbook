@@ -1,0 +1,386 @@
+Parameters:
+
+  # 実行対象のリージョン
+  Region:
+    Type: String
+    Default: "ap-northeast-1"
+    Description: Which region do you want to exeute pipeline.
+
+  # パイプラインの成果物を保管するS3バケット名
+  CodePipelineArtifactStoreBucketName:
+    Type: String
+    Default: pipeline-manifest
+    Description: Bucket name of code pipeline's artifact.
+
+  # デプロイ対象のEKSクラスター名
+  EKSClusterName:
+    Type: String
+    Default: eks-work-cluster
+    Description: Target EKS Cluster name.
+  
+  # kubectlのバージョン
+  KubectlVersion:
+    Type: String
+    Default: "1.14.0"
+    Description: The version of the kubectl command used in the code build task.
+
+  # CICD体験用に使うCode Commitリポジトリ
+  CodeCommitRepositoryNameForSampleAP:
+    Type: String
+    Default: "eks-work-cicd-repo"
+    Description: Code commit repo name used in this pipeline's source.
+  # トリガー対象のブランチ名
+  Branch:
+    Type: String
+    Description: CodeCommit branch name to execte pipeline.
+    Default: master
+
+  # CICD体験用に使うECRレジストリ
+  ECRNameForSampleAP:
+    Type: String
+    Default: "k8sbook/backend-app"
+    Description: ECR name used in this pipeline.
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Label: 
+          default: "Base Configuration"
+        Parameters: 
+          - Region
+      - 
+        Label: 
+          default: "Pipeline Configuration"
+        Parameters: 
+          - CodeCommitRepositoryNameForSampleAP
+          - Branch
+          - ECRNameForSampleAP
+          - CodePipelineArtifactStoreBucketName
+      - 
+        Label: 
+          default: "EKS Cluster Configuration"
+        Parameters: 
+          - KubectlVersion
+          - EKSClusterName
+
+Resources:
+
+  # S3 Bucket for Pipeline Arfifact store.
+  CodePipelineArtifactStoreBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${CodePipelineArtifactStoreBucketName}-${AWS::AccountId}
+
+  # Code Commit for SampleAP.
+  CodeCommitRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties: 
+      RepositoryDescription: String
+      RepositoryName: !Ref CodeCommitRepositoryNameForSampleAP
+
+  # IAM Role for Code Pipeline service Role
+  CodePipelineServiceRole: 
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EKS-SampleAP-CodePipelineServiceRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Service": "codepipeline.amazonaws.com"},
+            "Action": "sts:AssumeRole"
+          }]
+        }
+  CodePipelineServiceRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: EKS-SampleAP-CodePipelineServiceRolePolicy
+      Roles:
+      - !Ref CodePipelineServiceRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:GetObjectVersion
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+          Resource:
+            - arn:aws:s3:::codepipeline*
+            - arn:aws:s3:::elasticbeanstalk*
+        - Effect: Allow
+          Action:
+            - codecommit:CancelUploadArchive
+            - codecommit:GetBranch
+            - codecommit:GetCommit
+            - codecommit:GetUploadArchiveStatus
+            - codecommit:UploadArchive
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - codedeploy:CreateDeployment
+            - codedeploy:GetApplicationRevision
+            - codedeploy:GetDeployment
+            - codedeploy:GetDeploymentConfig
+            - codedeploy:RegisterApplicationRevision
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - elasticbeanstalk:*
+            - ec2:*
+            - elasticloadbalancing:*
+            - autoscaling:*
+            - cloudwatch:*
+            - s3:*
+            - sns:*
+            - cloudformation:*
+            - rds:*
+            - sqs:*
+            - ecs:*
+            - iam:PassRole
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - lambda:InvokeFunction
+            - lambda:ListFunctions
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - cloudformation:CreateStack
+            - cloudformation:DeleteStack
+            - cloudformation:DescribeStacks
+            - cloudformation:UpdateStack
+            - cloudformation:CreateChangeSet
+            - cloudformation:DeleteChangeSet
+            - cloudformation:DescribeChangeSet
+            - cloudformation:ExecuteChangeSet
+            - cloudformation:SetStackPolicy
+            - cloudformation:ValidateTemplate
+            - iam:PassRole
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - codebuild:BatchGetBuilds
+            - codebuild:StartBuild
+          Resource: "*"
+
+  # IAM Role for Code Build Service role.
+  CodeBuildServiceRole: 
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: EKS-SampleAP-CodeBuildServiceRole
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+          "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Service": "codebuild.amazonaws.com"},
+            "Action": "sts:AssumeRole"
+          }]
+        }
+  CodeBuildServiceRolePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: EKS-SampleAP-CodeBuildServiceRolePolicy
+      Roles:
+      - !Ref CodeBuildServiceRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource:
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectBuildApplicationAndPushToECR}
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectBuildApplicationAndPushToECR}:*
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectApplyToEKS}
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProjectApplyToEKS}:*
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:GetObjectVersion
+          Resource:
+            - !Sub arn:aws:s3:::${CodePipelineArtifactStoreBucket}*
+        - Effect: Allow
+          Action:
+            - ssm:GetParameters
+          Resource:
+            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/CodeBuild/*
+        - Effect: Allow
+          Action:
+            - eks:DescribeCluster
+          Resource:
+            - !Sub arn:aws:eks:${AWS::Region}:${AWS::AccountId}:cluster/${EKSClusterName}
+        - Effect: Allow
+          Action:
+            - "ecr:BatchCheckLayerAvailability"
+            - "ecr:BatchGetImage"
+            - "ecr:GetDownloadUrlForLayer"
+            - "ecr:PutImage"
+            - "ecr:InitiateLayerUpload"
+            - "ecr:UploadLayerPart"
+            - "ecr:CompleteLayerUpload"
+            - "ecr:GetAuthorizationToken"
+          Resource:
+            - "*"
+
+  # Code Build Project.
+  CodeBuildProjectBuildApplicationAndPushToECR:
+    Description: Creating AWS CodeBuild project
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: !Sub Building stage for ${Branch}.
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: Branch
+            Value: !Ref Branch
+          - Name: EKS_CLUSTER_NAME
+            Value: !Ref EKSClusterName
+          - Name: REGION
+            Value: !Ref Region
+          - Name: KUBECTL_VERSION
+            Value: !Ref KubectlVersion
+          - Name: REGISTORY_NAME
+            Value: !Ref ECRNameForSampleAP
+          - Name: REGISTORY_URI
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${Region}.amazonaws.com
+        Image: aws/codebuild/standard:2.0
+        Type: LINUX_CONTAINER
+        PrivilegedMode: True
+      Name: EKS-SampleAP-build
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: cicd/cloudformation/buildspec-build.yaml
+      TimeoutInMinutes: 5
+
+  # Code Build Project.
+  CodeBuildProjectApplyToEKS:
+    Description: Creating AWS CodeBuild project
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Description: !Sub Building stage for ${Branch}.
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        EnvironmentVariables:
+          - Name: Branch
+            Value: !Ref Branch
+          - Name: EKS_CLUSTER_NAME
+            Value: !Ref EKSClusterName
+          - Name: REGION
+            Value: !Ref Region
+          - Name: KUBECTL_VERSION
+            Value: !Ref KubectlVersion
+          - Name: REGISTORY_NAME
+            Value: !Ref ECRNameForSampleAP
+          - Name: REGISTORY_URI
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${Region}.amazonaws.com
+        Image: aws/codebuild/standard:2.0
+        Type: LINUX_CONTAINER
+        PrivilegedMode: True
+      Name: EKS-SampleAP-apply
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: cicd/cloudformation/buildspec-apply.yaml
+      TimeoutInMinutes: 5
+
+  # Main process of Code Pipeline.
+  ProjectPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Location: !Ref CodePipelineArtifactStoreBucket
+        Type: S3
+      Name: EKS-SampleAP-Pipeline
+      RestartExecutionOnUpdate: false
+      RoleArn:
+        !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - 
+          Name: Source
+          Actions:
+            -
+              Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: 1
+              OutputArtifacts:
+                -
+                  Name: SourceOutput
+              Configuration:
+                RepositoryName: !Ref CodeCommitRepositoryNameForSampleAP
+                BranchName: !Ref Branch
+              RunOrder: 1
+        -
+          Name: BuildApplicationAndPushToECR
+          Actions:
+            -
+              Name: CodeBuild
+              InputArtifacts:
+                -
+                  Name: SourceOutput
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProjectBuildApplicationAndPushToECR
+              OutputArtifacts:
+                -
+                  Name: CodebuildOutputBuild
+              RunOrder: 1
+        -
+          Name: ApplyApplicationToEKS
+          Actions:
+            -
+              Name: CodeBuild
+              InputArtifacts:
+                -
+                  Name: SourceOutput
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuildProjectApplyToEKS
+              OutputArtifacts:
+                -
+                  Name: CodebuildOutputApply
+              RunOrder: 1
+
+Outputs:
+  YourCodeCommitRepositoryUrl:
+    Value: !GetAtt CodeCommitRepository.CloneUrlHttp
+    Description: Set this string to your Git Settings.
+  YourECRUri:
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${Region}.amazonaws.com/${ECRNameForSampleAP}
+    Description: Set this string to your /cicd/kustomiation/prod/kustomization.yaml
+  YourCodeBuildServiceRoleArn:
+    Value: !GetAtt CodeBuildServiceRole.Arn
+    Description: Set this string to your EKS Cluster's RBAC.
+  
+
+  
+
+

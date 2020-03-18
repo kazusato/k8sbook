@@ -1,0 +1,30 @@
+{
+  "name": "frontend-app",
+  "version": "1.0.0",
+  "description": "Frontend sample application",
+  "author": "Sample App Developer",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "dev": "nuxt",
+    "build": "nuxt build",
+    "start": "nuxt start",
+    "generate": "nuxt generate"
+  },
+  "dependencies": {
+    "@nuxtjs/axios": "^5.9.5",
+    "@nuxtjs/vuetify": "1.11.0",
+    "nuxt": "^2.11.9",
+    "vuex-persistedstate": "^2.7.1"
+  },
+  "devDependencies": {
+    "stylus": "^0.54.7",
+    "stylus-loader": "^3.0.2",
+    "@vue/test-utils": "^1.0.0-beta.32",
+    "babel-core": "7.0.0-bridge.0",
+    "babel-jest": "^25.1.0",
+    "jest": "^25.1.0",
+    "vue-jest": "^3.0.5",
+    "nodemon": "^2.0.2"
+  }
+}

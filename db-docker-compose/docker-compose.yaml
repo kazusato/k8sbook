@@ -1,0 +1,16 @@
+version: "3"
+services:
+  backend-app-pg:
+    container_name: backend-app-pg
+    image: postgres:10.6
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_PASSWORD=myworkpg
+      - PGDATA=/data
+    volumes:
+      - ./workdir/data:/data
+    networks:
+      - backend-app-net
+networks:
+  backend-app-net:

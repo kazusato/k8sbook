@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  TargetRegion:
+    Type: String
+    Default: ap-northeast-1
+
+  BucketBaseName:
+    Type: String
+    Default: eks-work-batch-
+
+  BucketSuffix:
+    Type: String
+
+Resources:
+  BatchBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ["", [!Ref BucketBaseName, !Ref BucketSuffix]]
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  BatchUser:
+    Type: AWS::IAM::User
+    Properties:
+      Path: /
+      UserName: eks-work-batch-user
+
+  BatchUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref BatchUser
+
+  BatchBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BatchBucket
+      PolicyDocument:
+        Statement:
+          -
+            Action:
+              - s3:GetObject
+              - s3:DeleteObject
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt BatchUser.Arn
+            Resource: !Join ["", [!GetAtt BatchBucket.Arn, "/*"]]
+          -
+            Action:
+              - s3:ListBucket
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt BatchUser.Arn
+            Resource: !GetAtt BatchBucket.Arn
+
+  BatchUserAccessKeyParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: BatchUserAccessKey
+      Type: String
+      Value: !Ref BatchUserAccessKey
+
+  BatchUserSecretAccessKeyParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: BatchUserSecretAccessKey
+      Type: String
+      Value: !GetAtt BatchUserAccessKey.SecretAccessKey
+

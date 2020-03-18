@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+- ../base
+patches:
+- deployment.yaml
+
+nameSuffix: -test
+commonLabels:
+  app: backend-app-test
+
+images:
+  - name: centos
+    newTag: x.x.x # アプリケーションのバージョン番号
+    newName: <yourregistry_name> # ECRレジストリのURI

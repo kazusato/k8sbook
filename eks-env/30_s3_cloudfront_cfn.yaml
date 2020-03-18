@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Parameters:
+  TargetRegion:
+    Type: String
+    Default: ap-northeast-1
+
+  BucketBaseName:
+    Type: String
+    Default: eks-work-frontend-
+
+  BucketSuffix:
+    Type: String
+
+Resources:
+  ContentsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join ["", [!Ref BucketBaseName, !Ref BucketSuffix]]
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  ContentsDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt ContentsBucket.DomainName
+            CustomOriginConfig:
+              OriginProtocolPolicy: match-viewer
+        Enabled: true
+        DefaultRootObject: index.html
+        Comment: !Ref AWS::StackName
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ForwardedValues:
+            QueryString: false
+          ViewerProtocolPolicy: allow-all
+
+Outputs:
+  URL:
+    Value: !Join ["", ["http://", !GetAtt [ContentsDistribution, DomainName] ]]
+
+  DistributionID:
+    Value: !Ref ContentsDistribution

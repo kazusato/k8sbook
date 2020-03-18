@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: network-policy-for-servicea
+spec:
+  podSelector:
+    matchLabels:
+      app: ServiceA
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: ServiceB
+    ports:
+    - protocol: TCP
+      port: 80
+

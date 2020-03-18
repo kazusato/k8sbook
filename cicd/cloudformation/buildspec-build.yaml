@@ -1,0 +1,47 @@
+version: 0.2
+ 
+phases:
+  install:
+    runtime-versions:
+      java: openjdk11
+      docker: 18
+
+  pre_build:
+    commands:
+      # Install AWS CLI
+      - apt-get update
+      - apt install -y wget python
+      - wget https://bootstrap.pypa.io/get-pip.py
+      - python get-pip.py
+      - pip install awscli --upgrade
+
+      # $(aws ecr get-login --no-include-email --region us-east-2) #
+      - $(aws ecr get-login --no-include-email --region ${REGION})
+  #     # Install java11
+  #     - apt install -y wget
+  #     - apt-get update && apt-get install java-common
+  #     - wget https://d3pxv6yz143wms.cloudfront.net/11.0.3.7.1/java-11-amazon-corretto-jdk_11.0.3.7-1_amd64.deb
+  #     - dpkg --install java-11-amazon-corretto-jdk_11.0.3.7-1_amd64.deb
+  #     - export JAVA_HOME=/usr/lib/jvm/java-11-amazon-corretto
+
+      # Install yq to perse yaml.
+      - pip install yq
+
+      # set Version No
+      - export VERSION_NO=`cat cicd/kustomization/prod/kustomization.yaml |  yq .images[].newTag -r`
+
+  build:
+    commands:
+      # Build application.
+      - cd backend-app
+      - chmod 755 ./gradlew
+      # - ./gradlew build
+      - ./gradlew bootjar
+
+      # Build docker image.
+      # export REGISTORY_NAME=kaizwaa-k8s-sample
+      - docker build -t ${REGISTORY_NAME}:${VERSION_NO} --build-arg JAR_FILE=build/libs/backend-app-${VERSION_NO}.jar .
+
+      # Push to ECR registory.
+      - docker tag ${REGISTORY_NAME}:${VERSION_NO} ${REGISTORY_URI}/${REGISTORY_NAME}:${VERSION_NO}
+      - docker push ${REGISTORY_URI}/${REGISTORY_NAME}:${VERSION_NO}

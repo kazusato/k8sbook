@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: db-config
+stringData:
+  db-url: ${DB_URL}
+  db-username: mywork
+  db-password: ${DB_PASSWORD}

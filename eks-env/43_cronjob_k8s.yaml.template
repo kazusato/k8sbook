@@ -1,0 +1,61 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: batch-app
+spec:
+  schedule: "*/5 * * * *" # min hour day-of-month month day-of-week
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: batch-app
+              image: ${ECR_HOST}/k8sbook/batch-app:1.0.0
+              imagePullPolicy: Always
+              env:
+                - name: DB_URL
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-url
+                      name: db-config
+                - name: DB_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-username
+                      name: db-config
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: db-password
+                      name: db-config
+                - name: CLOUD_AWS_CREDENTIALS_ACCESSKEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: aws-accesskey
+                      name: batch-secret-config
+                - name: CLOUD_AWS_CREDENTIALS_SECRETKEY
+                  valueFrom:
+                    secretKeyRef:
+                      key: aws-secretkey
+                      name: batch-secret-config
+                - name: CLOUD_AWS_REGION_STATIC
+                  valueFrom:
+                    configMapKeyRef:
+                      key: aws-region
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_BUCKET_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      key: bucket-name
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_FOLDER_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      key: folder-name
+                      name: batch-app-config
+                - name: SAMPLE_APP_BATCH_RUN
+                  valueFrom:
+                    configMapKeyRef:
+                      key: batch-run
+                      name: batch-app-config
+          restartPolicy: OnFailure
