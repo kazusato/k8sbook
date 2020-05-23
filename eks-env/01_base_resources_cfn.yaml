@@ -54,6 +54,7 @@ Resources:
       AvailabilityZone: !Ref AvailabilityZone1
       CidrBlock: !Ref WorkerSubnet1Block
       VpcId: !Ref EksWorkVPC
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${ClusterBaseName}-WorkerSubnet1
@@ -64,6 +65,7 @@ Resources:
       AvailabilityZone: !Ref AvailabilityZone2
       CidrBlock: !Ref WorkerSubnet2Block
       VpcId: !Ref EksWorkVPC
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${ClusterBaseName}-WorkerSubnet2
@@ -74,6 +76,7 @@ Resources:
       AvailabilityZone: !Ref AvailabilityZone3
       CidrBlock: !Ref WorkerSubnet3Block
       VpcId: !Ref EksWorkVPC
+      MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Sub ${ClusterBaseName}-WorkerSubnet3
