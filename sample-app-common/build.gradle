@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'k8sbook'
-version = '0.5.0'
+version = '0.5.1'
 sourceCompatibility = '11'
 
 repositories {
@@ -14,7 +14,7 @@ repositories {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.apache.commons:commons-lang3:3.9'
     runtimeOnly 'org.postgresql:postgresql'
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
