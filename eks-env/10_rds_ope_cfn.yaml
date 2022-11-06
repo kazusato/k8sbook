@@ -125,7 +125,7 @@ Resources:
     Properties:
       DBInstanceIdentifier: eks-work-db
       Engine: postgres
-      EngineVersion: 10.6
+      EngineVersion: 10.21
       DBInstanceClass: db.t2.micro
       AllocatedStorage: 30
       StorageType: gp2
@@ -185,7 +185,7 @@ Resources:
     Type: AWS::RDS::DBParameterGroup
     Properties:
       Family: postgres10
-      Description: Parameter Group for PostgreSQL 10.6
+      Description: Parameter Group for PostgreSQL 10.21
 
   OpeServerSubnet:
     Type: AWS::EC2::Subnet
